@@ -1,0 +1,664 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sunburst Chart of Paradigms with Filter</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+      position: relative;
+    }
+    svg {
+      background: #fff;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 6px;
+      pointer-events: none;
+      font-size: 14px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      max-width: 300px;
+      line-height: 1.5;
+    }
+    .tooltip b {
+      font-weight: bold;
+    }
+    .tooltip i {
+      font-style: italic;
+    }
+    .filter-container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+    select {
+      padding: 5px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+    }
+    select:focus {
+      outline: none;
+      border-color: #3873E0;
+    }
+    .center-label {
+      font-size: 14px;
+      font-weight: bold;
+      text-anchor: middle;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="filter-container">
+    <select id="paradigm-filter">
+      <option value="all">All Paradigms</option>
+      <option value="Spiritual Paradigm">Spiritual Paradigm</option>
+      <option value="Reason & Integrity">Reason & Integrity</option>
+      <option value="Survival Paradigm">Survival Paradigm</option>
+    </select>
+  </div>
+  <svg width="600" height="600"></svg>
+  <script>
+    // Hierarchical data (unchanged)
+    const data = {
+      name: "Paradigms",
+      children: [
+        {
+          name: "Spiritual Paradigm",
+          children: [
+            {
+              name: "Enlightenment",
+              children: [
+                {
+                  name: "Ineffable",
+                  children: [
+                    { name: "Is", children: [{ name: "Self", value: 850 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Peace",
+              children: [
+                {
+                  name: "Bliss",
+                  children: [
+                    { name: "Perfect", children: [{ name: "All-Being", value: 600 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Joy",
+              children: [
+                {
+                  name: "Serenity",
+                  children: [
+                    { name: "Complete", children: [{ name: "One", value: 540 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Love",
+              children: [
+                {
+                  name: "Reverence",
+                  children: [
+                    { name: "Benign", children: [{ name: "Loving", value: 500 }] }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          name: "Reason & Integrity",
+          children: [
+            {
+              name: "Reason",
+              children: [
+                {
+                  name: "Understanding",
+                  children: [
+                    { name: "Meaningful", children: [{ name: "Wise", value: 400 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Acceptance",
+              children: [
+                {
+                  name: "Forgiveness",
+                  children: [
+                    { name: "Harmonious", children: [{ name: "Merciful", value: 350 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Willingness",
+              children: [
+                {
+                  name: "Optimism",
+                  children: [
+                    { name: "Hopeful", children: [{ name: "Inspiring", value: 310 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Neutrality",
+              children: [
+                {
+                  name: "Trust",
+                  children: [
+                    { name: "Satisfactory", children: [{ name: "Enabling", value: 250 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Courage",
+              children: [
+                {
+                  name: "Affirmation",
+                  children: [
+                    { name: "Feasible", children: [{ name: "Permitting", value: 200 }] }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          name: "Survival Paradigm",
+          children: [
+            {
+              name: "Pride",
+              children: [
+                {
+                  name: "Scorn",
+                  children: [
+                    { name: "Demanding", children: [{ name: "Indifferent", value: 175 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Anger",
+              children: [
+                {
+                  name: "Hate",
+                  children: [
+                    { name: "Antagonistic", children: [{ name: "Vengeful", value: 150 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Desire",
+              children: [
+                {
+                  name: "Craving",
+                  children: [
+                    { name: "Disappointing", children: [{ name: "Denying", value: 125 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Fear",
+              children: [
+                {
+                  name: "Anxiety",
+                  children: [
+                    { name: "Frightening", children: [{ name: "Punitive", value: 100 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Grief",
+              children: [
+                {
+                  name: "Regret",
+                  children: [
+                    { name: "Tragic", children: [{ name: "Disdainful", value: 75 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Apathy",
+              children: [
+                {
+                  name: "Despair",
+                  children: [
+                    { name: "Hopeless", children: [{ name: "Condemning", value: 50 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Guilt",
+              children: [
+                {
+                  name: "Blame",
+                  children: [
+                    { name: "Evil", children: [{ name: "Vindictive", value: 30 }] }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "Shame",
+              children: [
+                {
+                  name: "Humiliation",
+                  children: [
+                    { name: "Miserable", children: [{ name: "Despising", value: 20 }] }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    // Set dimensions and radius
+    const width = 600;
+    const height = 600;
+    const radius = Math.min(width, height) / 2;
+
+    const colorMap = {
+      "Survival Paradigm": "#DE5D5D",
+      "Reason & Integrity": "#57C193",
+      "Spiritual Paradigm": "#3873E0",
+      "Enlightenment": "#c88ee3",
+      "Peace": "#6a96e8",
+      "Joy": "#6a96e8",
+      "Love": "#6eb6be",
+      "Reason": "#6eb6be",
+      "Acceptance": "#81d1ae",
+      "Willingness": "#81d1ae",
+      "Neutrality": "#81d1ae",
+      "Courage": "#f5d36b",
+      "Pride": "#f5d36b",
+      "Anger": "#fbb383",
+      "Desire": "#fbb383",
+      "Fear": "#fbb383",
+      "Grief": "#e68686",
+      "Apathy": "#e68686",
+      "Guilt": "#e68686",
+      "Shame": "#e68686",
+      "Ineffable": "#d6aaea",
+      "Bliss": "#8fb0ee",
+      "Serenity": "#8fb0ee",
+      "Reverence": "#93c9ce",
+      "Understanding": "#93c9ce",
+      "Forgiveness": "#a1dcc2",
+      "Optimism": "#a1dcc2",
+      "Trust": "#a1dcc2",
+      "Affirmation": "#f8de91",
+      "Scorn": "#f8de91",
+      "Hate": "#fcc6a2",
+      "Craving": "#fcc6a2",
+      "Anxiety": "#fcc6a2",
+      "Regret": "#eca4a4",
+      "Despair": "#eca4a4",
+      "Blame": "#eca4a4",
+      "Humiliation": "#eca4a4",
+      "Self": "#e7cff3",
+      "All-Being": "#c0d3f5",
+      "One": "#c0d3f5",
+      "Loving": "#cee6e9",
+      "Wise": "#cee6e9",
+      "Merciful": "#caebdd",
+      "Inspiring": "#caebdd",
+      "Enabling": "#caebdd",
+      "Permitting": "#fbecc0",
+      "Indifferent": "#fbecc0",
+      "Vengeful": "#fddfcb",
+      "Denying": "#fddfcb",
+      "Punitive": "#fdd4b9",
+      "Disdainful": "#f5cccc",
+      "Condemning": "#f5cccc",
+      "Vindictive": "#f5cccc",
+      "Despising": "#f5cccc",
+      "Is": "#e0bfef",
+      "Perfect": "#abc4f2",
+      "Complete": "#abc4f2",
+      "Benign": "#add6da",
+      "Meaningful": "#add6da",
+      "Harmonious": "#b8e5d1",
+      "Hopeful": "#b8e5d1",
+      "Satisfactory": "#b8e5d1",
+      "Feasible": "#f9e6ac",
+      "Demanding": "#f9e6ac",
+      "Antagonistic": "#fdd4b9",
+      "Disappointing": "#fdd4b9",
+      "Frightening": "#fdd4b9",
+      "Tragic": "#f1baba",
+      "Hopeless": "#f1baba",
+      "Evil": "#f1baba",
+      "Miserable": "#f1baba"
+    };
+
+    // Create SVG container
+    const svg = d3.select("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+    // Create tooltip
+    const tooltip = d3.select("body")
+      .append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+    // Function to get color based on hierarchy
+    function getColor(d) {
+      if (colorMap[d.data.name]) return colorMap[d.data.name];
+      let ancestor = d;
+      while (!colorMap[ancestor.data.name] && ancestor.parent) {
+        ancestor = ancestor.parent;
+      }
+      return colorMap[ancestor.data.name] || "#ccc";
+    }
+
+    // Function to get Energetic Log from Name of Level
+    function getEnergeticLog(d) {
+      if (d.depth === 2) {
+        if (d.data.name === "Enlightenment") return "700-1000";
+        return d.children[0].children[0].children[0].value; // Name of Level
+      }
+      if (d.depth > 2) {
+        let ancestor = d;
+        while (ancestor.depth > 2) ancestor = ancestor.parent;
+        if (ancestor.data.name === "Enlightenment") return "700-1000";
+        return ancestor.children[0].children[0].children[0].value;
+      }
+      return null; // No Energetic Log for Paradigm or root
+    }
+
+    // Function to build tooltip content
+    function getTooltipContent(d) {
+      if (d.depth <= 1) return ""; // No tooltip for root or paradigms
+      const name = d.data.name;
+      let content = `<b>${name}</b><br>`;
+      const energeticLog = getEnergeticLog(d);
+      if (energeticLog) content += `<i>Energetic Log</i>: ${energeticLog}<br>`;
+      
+      // Get parent hierarchy
+      const ancestors = d.ancestors().reverse().slice(1); // Exclude root
+      const labels = ["Paradigm", "Name of Level", "Predominant Emotional State", "View of Life", "God-view"];
+      ancestors.forEach((ancestor, i) => {
+        if (i < ancestors.length - 1) { // Exclude current segment
+          content += `<i>${labels[ancestor.depth]}</i>: ${ancestor.data.name}<br>`;
+        }
+      });
+      return content;
+    }
+
+    // Function to filter data based on selected paradigm
+    function filterData(selectedParadigm) {
+      if (selectedParadigm === "all") {
+        return data;
+      }
+      return {
+        name: "Paradigms",
+        children: data.children.filter(paradigm => paradigm.name === selectedParadigm)
+      };
+    }
+
+    // Function to determine text orientation
+    function getTextOrientation(d, selectedParadigm) {
+      if (d.depth === 1) return "radial"; // Paradigms always radial
+      const name = d.data.name;
+      const paradigm = d.ancestors().find(a => a.depth === 1)?.data.name;
+
+      if (selectedParadigm === "Spiritual Paradigm" || selectedParadigm === "Reason & Integrity") {
+        return "circular";
+      }
+      if (selectedParadigm === "Survival Paradigm") {
+        if (["Despising", "Miserable", "Humiliation", "Shame", "Blame", "Guilt"].includes(name)) {
+          return "radial";
+        }
+        return "circular";
+      }
+      // All Paradigms
+      if (paradigm === "Survival Paradigm") {
+        if (["Vengeful", "Indifferent", "Demanding"].includes(name)) {
+          return "circular";
+        }
+        return "radial";
+      }
+      if (paradigm === "Reason & Integrity") {
+        if (["Affirmation", "Courage", "Neutrality", "Acceptance", "Willingness"].includes(name)) {
+          return "circular"; // Ensure Acceptance and Willingness are circular
+        }
+        return "circular";
+      }
+      return "circular"; // Spiritual Paradigm and others
+    }
+
+    // List of labels to exclude from font size increase in "All Paradigms" filter
+    const excludedLabelsInAll = [
+      "Vengeful", "Permitting", "Feasible", "Satisfactory", "Optimism",
+      "Acceptance", "Willingness", "Forgiveness", "Understanding", "Denying"
+    ];
+
+    // Labels to adjust boundaries in "All Paradigms" filter
+    const boundaryAdjustLabels = ["Neutrality", "Courage", "Demanding"];
+
+    // Function to draw or update the sunburst chart
+    function drawSunburst(selectedParadigm) {
+      // Clear existing chart
+      svg.selectAll("*").remove();
+
+      // Create partition layout
+      const partition = d3.partition()
+        .size([2 * Math.PI, radius]);
+
+      // Create hierarchy with filtered data
+      const filteredData = filterData(selectedParadigm);
+      const root = d3.hierarchy(filteredData)
+        .sum(d => d.value || 0)
+        .sort((a, b) => b.value - a.value);
+
+      // Apply partition layout
+      partition(root);
+
+      // Create arc generator for paths
+      const arc = d3.arc()
+        .startAngle(d => d.x0)
+        .endAngle(d => d.x1)
+        .innerRadius(d => d.depth === 1 ? 0 : d.y0)
+        .outerRadius(d => d.y1);
+
+      // Draw arcs
+      svg.selectAll("path.arc")
+        .data(root.descendants().filter(d => d.depth))
+        .enter()
+        .append("path")
+        .attr("class", "arc")
+        .attr("d", arc)
+        .attr("fill", d => getColor(d))
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1)
+        .attr("opacity", d => 1 - d.depth * 0)
+        .on("mouseover", function(event, d) {
+          if (d.depth <= 1) return; // No tooltip for root or paradigms
+          tooltip.transition()
+            .duration(200)
+            .style("opacity", 0.9);
+          tooltip.html(getTooltipContent(d))
+            .style("left", (event.pageX + 15) + "px")
+            .style("top", (event.pageY - 30) + "px");
+        })
+        .on("mouseout", function() {
+          tooltip.transition()
+            .duration(300)
+            .style("opacity", 0);
+        });
+
+      // Create arc paths for text (for circular orientation)
+      const textArc = d3.arc()
+        .startAngle(d => d.x0)
+        .endAngle(d => d.x1)
+        .innerRadius(d => (d.y0 + d.y1) / 2)
+        .outerRadius(d => (d.y0 + d.y1) / 2);
+
+      svg.selectAll("path.text-path")
+        .data(root.descendants().filter(d => d.depth && !(filteredData.children.length === 1 && d.depth === 1)))
+        .enter()
+        .append("path")
+        .attr("class", "text-path")
+        .attr("id", (d, i) => `text-path-${i}`)
+        .attr("d", textArc)
+        .style("fill", "none")
+        .style("stroke", "none");
+
+      // Add labels for levels, excluding depth 1 when filtered
+      svg.selectAll("text:not(.center-label)")
+        .data(root.descendants().filter(d => d.depth && !(filteredData.children.length === 1 && d.depth === 1)))
+        .enter()
+        .each(function(d, i) {
+          const orientation = getTextOrientation(d, selectedParadigm);
+          const text = d3.select(this).append("text")
+            .attr("class", "label")
+            .style("fill", "#000")
+            .style("font-size", () => {
+              const isRoot = d.depth === 1;
+              const radius = isRoot ? d.y1 * 0.6 : (d.y0 + d.y1) / 2;
+              const arcLength = (d.x1 - d.x0) * radius;
+              const radialHeight = d.y1 - d.y0;
+              let fontSize;
+              if (isRoot) {
+                // Font size for depth 1 (paradigms, unchanged)
+                fontSize = Math.min(8, arcLength / d.data.name.length * 1.5, radialHeight * 0.8);
+                fontSize = Math.max(fontSize, 10);
+              } else {
+                // Font size for depth 2+ based on slice size
+                const isExcluded = selectedParadigm === "all" && excludedLabelsInAll.includes(d.data.name);
+                const isCircular = orientation === "circular";
+                const needsBoundaryAdjust = selectedParadigm === "all" && boundaryAdjustLabels.includes(d.data.name);
+                const isNeutralityOrCourageInReason = selectedParadigm === "Reason & Integrity" && ["Neutrality", "Courage"].includes(d.data.name);
+                const baseFontSize = isCircular && !isExcluded && !needsBoundaryAdjust ? 16 : (needsBoundaryAdjust ? 10 : 12);
+                const arcLengthFactor = arcLength / d.data.name.length * (needsBoundaryAdjust ? 0.6 : (isCircular && !isExcluded ? 1.6 : 1.8));
+                const radialHeightFactor = radialHeight * (needsBoundaryAdjust ? 0.35 : (isCircular && !isExcluded ? 0.75 : 0.85));
+                fontSize = Math.min(isNeutralityOrCourageInReason ? 16 : baseFontSize, arcLengthFactor, radialHeightFactor);
+                fontSize = Math.max(fontSize, 8);
+              }
+              return fontSize + "px";
+            });
+
+          if (orientation === "radial") {
+            text.attr("transform", () => {
+              const angle = (d.x0 + d.x1) / 2;
+              const isRoot = d.depth === 1;
+              const radius = isRoot ? d.y1 * 0.52 : (d.y0 + d.y1) / 2;
+              const rotate = angle * 180 / Math.PI - 90;
+              const flip = angle > Math.PI ? 180 : 0;
+              return `rotate(${rotate}) translate(${radius},0) rotate(${flip})`;
+            })
+            .attr("text-anchor", "middle")
+            .text(d.data.name);
+          } else {
+            text.append("textPath")
+              .attr("xlink:href", `#text-path-${i}`)
+              .attr("startOffset", "25%")
+              .attr("text-anchor", "middle")
+              .text(d.data.name)
+              .each(function(d) {
+                // Adjust text orientation to prevent half downwards-half upwards issue
+                const angle = ((d.x0 + d.x1) / 2) * 180 / Math.PI;
+                const needsFlip = angle > 90 && angle < 270;
+                if (needsFlip) {
+                  d3.select(this)
+                    .attr("startOffset", "75%") // Reverse text direction
+                    .attr("text-anchor", "middle");
+                }
+              });
+          }
+        });
+
+      // Add center label for paradigm when a single paradigm is selected
+      if (filteredData.children.length === 1) {
+        svg.append("text")
+          .attr("class", "center-label")
+          .attr("dy", "0.3em")
+          .text(filteredData.children[0].name)
+          .style("opacity", 1);
+      }
+    }
+
+    // Initial draw with all paradigms
+    drawSunburst("all");
+
+    // Add event listener for dropdown
+    d3.select("#paradigm-filter").on("change", function() {
+      const selectedParadigm = this.value;
+      drawSunburst(selectedParadigm);
+    });
+  </script>
+</body>
+</html>
